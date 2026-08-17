@@ -1,5 +1,7 @@
 # TAMU PHONE
 
+![TAMU PHONE](branding/banner.png)
+
 Meet TAMU, a blunt smug cat that lives inside a phone. You can always rely on him to help
 you bend the rules (●'◡'●).
 

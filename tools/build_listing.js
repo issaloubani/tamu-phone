@@ -16,6 +16,14 @@ const RAW = "https://raw.githubusercontent.com/issaloubani/tamu-phone/main/";
 const root = path.join(__dirname, "..");
 let md = fs.readFileSync(path.join(root, "README.md"), "utf8");
 
+// mods.one has its own banner and icon fields, so anything from branding/ would appear
+// twice on the listing page. Strip those, keep the screenshots.
+let stripped = 0;
+md = md.replace(/^!\[[^\]]*\]\(branding\/[^)]+\)\n\n?/gm, () => {
+    stripped++;
+    return "";
+});
+
 // Relative image paths -> absolute raw URLs. Leaves anything already absolute alone.
 let rewritten = 0;
 md = md.replace(/!\[([^\]]*)\]\((?!https?:\/\/)([^)]+)\)/g, (_, alt, src) => {
@@ -36,5 +44,6 @@ const out = path.join(root, "branding", "mods-one-description.md");
 fs.writeFileSync(out, md);
 
 console.log(`wrote ${path.relative(root, out)}`);
+console.log(`  ${stripped} branding image(s) removed, the listing has its own fields`);
 console.log(`  ${rewritten} image path(s) made absolute`);
 console.log(`  ${dropped} source-notes section(s) dropped`);
