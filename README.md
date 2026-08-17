@@ -13,7 +13,8 @@ He can help you with:
 
 - **Patching everyone up.** Full HEART, full JUICE, everyone, instantly. No, he will not
   explain how.
-- **Bringing back the fallen.** If nobody is down he will tell you so, flatly.
+- **Shaking off whatever is stuck.** STRESSED OUT and anything else clinging to the party
+  after a fight. If nobody has anything, he will tell you so, flatly.
 - **Party management.** Add someone, send someone home. He only offers people who belong in
   the world you are currently standing in, because the alternative crashes the game and he
   is not doing that to you.

@@ -425,22 +425,34 @@
             {
                 label: "PATCH EVERYONE UP",
                 run: () => {
+                    // setHp triggers refresh, which drops the death state on its own, so
+                    // this also covers a downed actor without needing a separate revive.
                     party().forEach(a => { a.setHp(a.mhp); a.setMp(a.mmp); });
                     return { lines: ["Done. Try not to spend it all at once."], face: FACE.SMUG };
                 }
             },
             {
-                label: "BRING BACK THE FALLEN",
+                /*
+                 * There is deliberately no "revive" option. Scene_Battle.terminate in
+                 * GTP_OmoriFixes.js:1896 removes state 1 and revives every party member on
+                 * the way out of every battle, so UNCONSCIOUS cannot exist on the map, and
+                 * the map is the only place this phone opens. It would be a button that
+                 * could never do anything.
+                 *
+                 * States are the thing that actually survives a battle. STRESSED OUT is the
+                 * one players will hit; the rest of the emotion states clear themselves.
+                 */
+                label: "SHAKE OFF WHATEVER IS STUCK",
                 run: () => {
-                    const down = party().filter(a => a.isDead());
-                    if (!down.length) {
-                        return { lines: ["Everyone is already standing."], face: FACE.FLAT };
+                    const afflicted = party().filter(a => a.states().length > 0);
+                    if (!afflicted.length) {
+                        return { lines: ["Nothing is stuck on anybody."], face: FACE.FLAT };
                     }
-                    down.forEach(a => { a.revive(); a.setHp(a.mhp); });
-                    return {
-                        lines: [`Back on their feet: ${down.map(a => a.name()).join(", ")}.`],
-                        face: FACE.PLEASED
-                    };
+                    const names = Array.from(new Set(
+                        afflicted.reduce((all, a) => all.concat(a.states().map(s => s.name)), [])
+                    ));
+                    afflicted.forEach(a => { a.clearStates(); a.refresh(); });
+                    return { lines: [`Gone: ${names.join(", ")}.`], face: FACE.SMUG };
                 }
             },
             { label: "ADD SOMEONE", to: "party_add" },
