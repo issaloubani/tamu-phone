@@ -56,10 +56,69 @@ const version = JSON.parse(fs.readFileSync(path.join(root, "mod.json"), "utf8"))
 const outDir = process.argv[2] || root;
 const outFile = path.join(outDir, `tamuphone-${version}.zip`);
 
+const id = JSON.parse(fs.readFileSync(path.join(root, "mod.json"), "utf8")).id;
+
 const stamp = dosStamp(new Date());
 const local = [];
 const central = [];
 let offset = 0;
+let count = 0;
+
+/*
+ * Append one entry. `raw` null means a directory.
+ *
+ * The directory entry is not optional. Most readers infer folders from the slashes in file
+ * paths, so a zip of only files extracts correctly and looks fine, but a validator that
+ * counts folders sees zero of them. mods.one wants exactly one folder named after the mod
+ * id, so the top level gets a real entry. Subfolders stay implicit, which keeps the count
+ * at exactly one however the check is written.
+ */
+function addEntry(name, raw) {
+    const isDir = raw === null;
+    const nameBuf = Buffer.from(isDir ? `${name}/` : name, "utf8");
+    const body = isDir ? Buffer.alloc(0) : zlib.deflateRawSync(raw, { level: 9 });
+    const crc = isDir ? 0 : crc32(raw);
+    const method = isDir ? 0 : 8;                    // store vs deflate
+    const size = isDir ? 0 : raw.length;
+
+    const lh = Buffer.alloc(30);
+    lh.writeUInt32LE(0x04034b50, 0);
+    lh.writeUInt16LE(20, 4);            // version needed
+    lh.writeUInt16LE(0, 6);             // flags
+    lh.writeUInt16LE(method, 8);
+    lh.writeUInt16LE(stamp.time, 10);
+    lh.writeUInt16LE(stamp.date, 12);
+    lh.writeUInt32LE(crc, 14);
+    lh.writeUInt32LE(body.length, 18);
+    lh.writeUInt32LE(size, 22);
+    lh.writeUInt16LE(nameBuf.length, 26);
+    lh.writeUInt16LE(0, 28);
+    local.push(lh, nameBuf, body);
+
+    const cd = Buffer.alloc(46);
+    cd.writeUInt32LE(0x02014b50, 0);
+    cd.writeUInt16LE(20, 4);            // version made by
+    cd.writeUInt16LE(20, 6);            // version needed
+    cd.writeUInt16LE(0, 8);
+    cd.writeUInt16LE(method, 10);
+    cd.writeUInt16LE(stamp.time, 12);
+    cd.writeUInt16LE(stamp.date, 14);
+    cd.writeUInt32LE(crc, 16);
+    cd.writeUInt32LE(body.length, 20);
+    cd.writeUInt32LE(size, 24);
+    cd.writeUInt16LE(nameBuf.length, 28);
+    // External attributes: set the MS-DOS directory bit so the entry is unambiguously a
+    // folder even to a reader that does not look at the trailing slash.
+    cd.writeUInt32LE(isDir ? 0x10 : 0, 38);
+    cd.writeUInt32LE(offset, 42);
+    central.push(cd, nameBuf);
+
+    offset += lh.length + nameBuf.length + body.length;
+    count++;
+}
+
+addEntry(id, null);
+console.log(`  ${"<dir>".padStart(7)}                ${id}/`);
 
 for (const rel of FILES) {
     const full = path.join(root, rel);
@@ -67,52 +126,18 @@ for (const rel of FILES) {
         console.error(`missing: ${rel}`);
         process.exit(1);
     }
-
-    const name = Buffer.from(`tamuphone/${rel}`, "utf8");
     const raw = fs.readFileSync(full);
-    const deflated = zlib.deflateRawSync(raw, { level: 9 });
-    const crc = crc32(raw);
-
-    const lh = Buffer.alloc(30);
-    lh.writeUInt32LE(0x04034b50, 0);
-    lh.writeUInt16LE(20, 4);            // version needed
-    lh.writeUInt16LE(0, 6);             // flags
-    lh.writeUInt16LE(8, 8);             // deflate
-    lh.writeUInt16LE(stamp.time, 10);
-    lh.writeUInt16LE(stamp.date, 12);
-    lh.writeUInt32LE(crc, 14);
-    lh.writeUInt32LE(deflated.length, 18);
-    lh.writeUInt32LE(raw.length, 22);
-    lh.writeUInt16LE(name.length, 26);
-    lh.writeUInt16LE(0, 28);
-    local.push(lh, name, deflated);
-
-    const cd = Buffer.alloc(46);
-    cd.writeUInt32LE(0x02014b50, 0);
-    cd.writeUInt16LE(20, 4);            // version made by
-    cd.writeUInt16LE(20, 6);            // version needed
-    cd.writeUInt16LE(0, 8);
-    cd.writeUInt16LE(8, 10);
-    cd.writeUInt16LE(stamp.time, 12);
-    cd.writeUInt16LE(stamp.date, 14);
-    cd.writeUInt32LE(crc, 16);
-    cd.writeUInt32LE(deflated.length, 20);
-    cd.writeUInt32LE(raw.length, 24);
-    cd.writeUInt16LE(name.length, 28);
-    cd.writeUInt32LE(offset, 42);
-    central.push(cd, name);
-
-    offset += lh.length + name.length + deflated.length;
-    console.log(`  ${String(raw.length).padStart(7)} -> ${String(deflated.length).padStart(7)}  tamuphone/${rel}`);
+    addEntry(`${id}/${rel}`, raw);
+    console.log(`  ${String(raw.length).padStart(7)} -> ${String(zlib.deflateRawSync(raw, { level: 9 }).length).padStart(7)}  ${id}/${rel}`);
 }
 
 const centralBuf = Buffer.concat(central);
 const eocd = Buffer.alloc(22);
 eocd.writeUInt32LE(0x06054b50, 0);
-eocd.writeUInt16LE(FILES.length, 8);
-eocd.writeUInt16LE(FILES.length, 10);
+eocd.writeUInt16LE(count, 8);
+eocd.writeUInt16LE(count, 10);
 eocd.writeUInt32LE(centralBuf.length, 12);
 eocd.writeUInt32LE(offset, 16);
 
 fs.writeFileSync(outFile, Buffer.concat([...local, centralBuf, eocd]));
-console.log(`\nwrote ${outFile}  ${fs.statSync(outFile).size} bytes  (${FILES.length} files)`);
+console.log(`\nwrote ${outFile}  ${fs.statSync(outFile).size} bytes  (1 folder, ${FILES.length} files)`);
