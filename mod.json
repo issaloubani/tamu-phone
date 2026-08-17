@@ -1,0 +1,21 @@
+{
+    "$schema": "https://rph.space/oneloader.manifestv1.schema.json",
+    "id": "tamuphone",
+    "name": "TAMU PHONE",
+    "description": "A phone that calls TAMU, who is willing to bend the rules for you.",
+    "version": "0.1.0",
+    "manifestVersion": 1,
+
+    "files": {
+        "plugins": [
+            "plugins/tamu_phone.js"
+        ],
+        "data_delta": [
+            "data/items.jsond",
+            "data/commonevents.jsond"
+        ],
+        "assets": [
+            "img/faces/TAMU.png"
+        ]
+    }
+}

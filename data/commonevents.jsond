@@ -1,0 +1,10 @@
+[
+    { "op": "test", "path": "/1995/name", "value": "" },
+
+    { "op": "replace", "path": "/1995/name", "value": "TAMU PHONE" },
+    { "op": "replace", "path": "/1995/trigger", "value": 0 },
+    { "op": "replace", "path": "/1995/list", "value": [
+        { "code": 355, "indent": 0, "parameters": ["$tamuPhone.call();"] },
+        { "code": 0,   "indent": 0, "parameters": [] }
+    ] }
+]

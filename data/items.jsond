@@ -1,0 +1,14 @@
+[
+    { "op": "test", "path": "/995/name", "value": "" },
+
+    { "op": "replace", "path": "/995/name", "value": "TAMU PHONE" },
+    { "op": "replace", "path": "/995/description", "value": "A phone with exactly one number in it.\nTAMU picks up on the first ring." },
+    { "op": "replace", "path": "/995/itypeId", "value": 2 },
+    { "op": "replace", "path": "/995/consumable", "value": false },
+    { "op": "replace", "path": "/995/occasion", "value": 2 },
+    { "op": "replace", "path": "/995/scope", "value": 0 },
+    { "op": "replace", "path": "/995/price", "value": 0 },
+    { "op": "replace", "path": "/995/effects", "value": [
+        { "code": 44, "dataId": 1995, "value1": 0, "value2": 0 }
+    ] }
+]
