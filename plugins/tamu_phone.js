@@ -457,34 +457,18 @@
             {
                 label: "PATCH EVERYONE UP",
                 run: () => {
-                    // setHp triggers refresh, which drops the death state on its own, so
-                    // this also covers a downed actor without needing a separate revive.
+                    /*
+                     * setHp triggers refresh, which drops the death state on its own, so
+                     * this also covers a downed actor without needing a separate revive.
+                     *
+                     * Do not add one. Scene_Battle.terminate in GTP_OmoriFixes.js:1896
+                     * removes state 1 and revives every party member on the way out of
+                     * every battle, so UNCONSCIOUS cannot survive to the map, and the map
+                     * is the only place this phone opens. It would be a button that could
+                     * never do anything.
+                     */
                     party().forEach(a => { a.setHp(a.mhp); a.setMp(a.mmp); });
                     return { lines: ["Full HEART, full JUICE.", "Try to keep it that way."], face: FACE.SMUG };
-                }
-            },
-            {
-                /*
-                 * There is deliberately no "revive" option. Scene_Battle.terminate in
-                 * GTP_OmoriFixes.js:1896 removes state 1 and revives every party member on
-                 * the way out of every battle, so UNCONSCIOUS cannot exist on the map, and
-                 * the map is the only place this phone opens. It would be a button that
-                 * could never do anything.
-                 *
-                 * States are the thing that actually survives a battle. STRESSED OUT is the
-                 * one players will hit; the rest of the emotion states clear themselves.
-                 */
-                label: "CLEAR STATUS EFFECTS",
-                run: () => {
-                    const afflicted = party().filter(a => a.states().length > 0);
-                    if (!afflicted.length) {
-                        return { lines: ["Nobody has anything on them."], face: FACE.FLAT };
-                    }
-                    const names = Array.from(new Set(
-                        afflicted.reduce((all, a) => all.concat(a.states().map(s => s.name)), [])
-                    ));
-                    afflicted.forEach(a => { a.clearStates(); a.refresh(); });
-                    return { lines: [`Gone: ${names.join(", ")}.`], face: FACE.SMUG };
                 }
             },
             { label: "SET THEIR NUMBERS", to: "stats" },

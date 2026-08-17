@@ -16,8 +16,6 @@ He can help you with:
 - **Setting HEART and JUICE to a number.** 100 up to 999, for everyone at once. He raises
   the ceiling first, because otherwise the game quietly caps you at whatever you already
   had. There is an option to put the limits back when you are done.
-- **Clearing status effects.** STRESSED OUT and anything else still clinging to the party
-  after a fight. He tells you what he removed. If there is nothing, he says so, flatly.
 - **Party management.** Add someone, send someone home. He only offers people who belong in
   the world you are currently standing in, because the alternative crashes the game and he
   is not doing that to you.
@@ -37,7 +35,6 @@ The whole thing, if you would rather see it at once:
 TAMU
 ├─ THE PARTY
 │  ├─ PATCH EVERYONE UP         full HEART and JUICE
-│  ├─ CLEAR STATUS EFFECTS      STRESSED OUT and anything else
 │  ├─ SET THEIR NUMBERS
 │  │  ├─ HEART                  100 up to 999
 │  │  ├─ JUICE                  100 up to 999
