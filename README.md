@@ -31,12 +31,38 @@ call him again. OMORI gets a very different conversation than HERO does （*゜�
 
 ![Adjusting how you walk](screenshots/04-how-i-walk.png)
 
+The whole thing, if you would rather see it at once:
+
+```
+TAMU
+├─ THE PARTY
+│  ├─ PATCH EVERYONE UP         full HEART and JUICE
+│  ├─ CLEAR STATUS EFFECTS      STRESSED OUT and anything else
+│  ├─ SET THEIR NUMBERS
+│  │  ├─ HEART                  100 up to 999
+│  │  ├─ JUICE                  100 up to 999
+│  │  └─ PUT THEIR LIMITS BACK
+│  ├─ ADD SOMEONE               this world's cast only
+│  └─ SEND SOMEONE HOME
+├─ ITEMS AND CLAMS
+│  ├─ CHANGE THAT               1, 10 or 99 at a time
+│  ├─ GIVE ME SOMETHING         every item in the game
+│  ├─ GIVE ME CLAMS             1000 a go
+│  └─ THE PHONE ITSELF
+└─ HOW I WALK
+   ├─ FASTER / SLOWER
+   └─ WALK THROUGH WALLS
+```
+
 ## How to call him
 
 Press **J** on the map.
 
 That is it. There is also a TAMU PHONE key item that does the same thing, in case you want
-to feel like you earned it, but the key works from the start.
+to feel like you earned it, but the hotkey works from the start.
+
+If **J** does nothing, it is bound elsewhere on your setup. Change one number at the top of
+`plugins/tamu_phone.js`, the free keys are listed right there in the comment.
 
 First time you call on a save, he introduces himself. After that he gets straight to the
 point, like a normal person. Cat. Whatever he is.
@@ -44,6 +70,16 @@ point, like a normal person. Cat. Whatever he is.
 ![The phone ringing and TAMU picking up](screenshots/02-first-call.png)
 
 ![TAMU explaining himself](screenshots/03-intro.png)
+
+## Use a save slot you do not care about
+
+Obvious, but saying it anyway: these are cheats and they go into your save file.
+
+**SET THEIR NUMBERS** is the one to watch. Raising HEART and JUICE past their cap is a real
+stat change written onto the actor, not a temporary buff, so it survives saving, loading and
+closing the game. **PUT THEIR LIMITS BACK** undoes it exactly, but only if you remember to.
+
+TAMU will not stop you. He does not really see the problem （*゜ー゜*）.
 
 ## Install
 
@@ -106,3 +142,13 @@ them is the order they land in, and it has to match the `FACE` map at the top of
 PNG, which is what you need when an image generator hands you back a JPEG with its own
 transparency checkerboard baked in. It needs `npm i jpeg-js` for JPEG input; PNG input works
 with no dependencies.
+
+Two things that make editing the writing bearable. From the console:
+
+```js
+$tamuPhone.forget()    // this save forgets it met him, so the intro replays
+$tamuPhone.state       // page, amount, whether a call is live
+```
+
+Whether a save has met TAMU lives on `$gameSystem`, which is serialized with the save, so
+the introduction is per slot rather than global.
