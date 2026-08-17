@@ -369,20 +369,52 @@
         );
     }
 
-    /* Build a paged option list out of a long array. */
-    function paged(list, page, perPage, makeOption, backTo) {
+    /* Build a paged option list out of a long array. selfScreen is the screen being paged. */
+    function paged(list, page, perPage, makeOption, backTo, selfScreen) {
         const start = page * perPage;
         const slice = list.slice(start, start + perPage);
         const options = slice.map(makeOption);
 
         if (start + perPage < list.length) {
-            options.push({ label: "MORE...", run: () => { state.page = page + 1; return null; }, back: state.pageScreen });
+            options.push({ label: "MORE...", run: () => { state.page = page + 1; return null; }, back: selfScreen });
         }
         if (page > 0) {
-            options.push({ label: "BACK A PAGE", run: () => { state.page = page - 1; return null; }, back: state.pageScreen });
+            options.push({ label: "BACK A PAGE", run: () => { state.page = page - 1; return null; }, back: selfScreen });
         }
         options.push({ label: "NEVER MIND", to: backTo });
         return options;
+    }
+
+    /*
+     * Values offered for HEART and JUICE.
+     *
+     * Setting these is not just setHp: refresh() clamps _hp to mhp (rpg_objects.js:2651),
+     * so asking for 999 on an actor whose max is 47 silently gives you 47. The maximum has
+     * to be raised first, via addParam, which writes into _paramPlus and is saved with the
+     * actor. That is a real, persistent stat change, which is why there is an option to put
+     * it back.
+     */
+    const STAT_VALUES = [100, 200, 300, 400, 500, 600, 700, 800, 900, 999];
+
+    const PARAM = { HP: 0, MP: 1 };
+
+    function setStat(paramId, value) {
+        party().forEach(a => {
+            const cap = a.param(paramId);
+            if (value > cap) a.addParam(paramId, value - cap);
+            if (paramId === PARAM.HP) a.setHp(value);
+            else a.setMp(value);
+        });
+    }
+
+    /* Undo every raise this menu made, using the public API rather than poking _paramPlus. */
+    function restoreLimits() {
+        party().forEach(a => {
+            a.addParam(PARAM.HP, -a.paramPlus(PARAM.HP));
+            a.addParam(PARAM.MP, -a.paramPlus(PARAM.MP));
+            a.setHp(Math.min(a.hp, a.mhp));
+            a.setMp(Math.min(a.mp, a.mmp));
+        });
     }
 
     // ------------------------------------------------------------------------
@@ -428,7 +460,7 @@
                     // setHp triggers refresh, which drops the death state on its own, so
                     // this also covers a downed actor without needing a separate revive.
                     party().forEach(a => { a.setHp(a.mhp); a.setMp(a.mmp); });
-                    return { lines: ["Done. Try not to spend it all at once."], face: FACE.SMUG };
+                    return { lines: ["Full HEART, full JUICE.", "Try to keep it that way."], face: FACE.SMUG };
                 }
             },
             {
@@ -442,11 +474,11 @@
                  * States are the thing that actually survives a battle. STRESSED OUT is the
                  * one players will hit; the rest of the emotion states clear themselves.
                  */
-                label: "SHAKE OFF WHATEVER IS STUCK",
+                label: "CLEAR STATUS EFFECTS",
                 run: () => {
                     const afflicted = party().filter(a => a.states().length > 0);
                     if (!afflicted.length) {
-                        return { lines: ["Nothing is stuck on anybody."], face: FACE.FLAT };
+                        return { lines: ["Nobody has anything on them."], face: FACE.FLAT };
                     }
                     const names = Array.from(new Set(
                         afflicted.reduce((all, a) => all.concat(a.states().map(s => s.name)), [])
@@ -455,10 +487,60 @@
                     return { lines: [`Gone: ${names.join(", ")}.`], face: FACE.SMUG };
                 }
             },
+            { label: "SET THEIR NUMBERS", to: "stats" },
             { label: "ADD SOMEONE", to: "party_add" },
             { label: "SEND SOMEONE HOME", to: "party_remove" },
             { label: "BACK", to: "root" }
         ]
+    });
+
+    screen("stats", {
+        text: () => {
+            const raised = party().filter(a => a.paramPlus(PARAM.HP) || a.paramPlus(PARAM.MP));
+            return raised.length
+                ? ["Which one?", `I have already raised the ceiling on ${raised.length} of them.`]
+                : ["Which one?", "I can push these past what they should hold."];
+        },
+        options: () => [
+            { label: "HEART", run: () => { state.page = 0; return null; }, back: "set_hp" },
+            { label: "JUICE", run: () => { state.page = 0; return null; }, back: "set_mp" },
+            {
+                label: "PUT THEIR LIMITS BACK",
+                run: () => {
+                    const raised = party().filter(a => a.paramPlus(PARAM.HP) || a.paramPlus(PARAM.MP));
+                    if (!raised.length) {
+                        return { lines: ["I have not touched their limits."], face: FACE.FLAT };
+                    }
+                    restoreLimits();
+                    return { lines: ["Back to whatever they were born with."], face: FACE.NEUTRAL };
+                }
+            },
+            { label: "BACK", to: "party" }
+        ]
+    });
+
+    screen("set_hp", {
+        text: () => [`HEART for everyone. Currently ${party().map(a => a.mhp).join(", ")}.`],
+        options: () => paged(STAT_VALUES, state.page, 6, v => ({
+            label: String(v),
+            run: () => {
+                setStat(PARAM.HP, v);
+                return { lines: [`${v} HEART each. Do not get comfortable.`], face: FACE.SMUG };
+            },
+            back: "set_hp"
+        }), "stats", "set_hp")
+    });
+
+    screen("set_mp", {
+        text: () => [`JUICE for everyone. Currently ${party().map(a => a.mmp).join(", ")}.`],
+        options: () => paged(STAT_VALUES, state.page, 6, v => ({
+            label: String(v),
+            run: () => {
+                setStat(PARAM.MP, v);
+                return { lines: [`${v} JUICE each. Go be ridiculous.`], face: FACE.SMUG };
+            },
+            back: "set_mp"
+        }), "stats", "set_mp")
     });
 
     screen("party_add", {
@@ -553,7 +635,6 @@
     });
 
     state.page = 0;
-    state.pageScreen = "items_list";
 
     screen("items_list", {
         text: () => {
@@ -573,7 +654,8 @@
                 },
                 back: "items_list"
             }),
-            "items"
+            "items",
+            "items_list"
         )
     });
 
