@@ -14,10 +14,16 @@
     const FACE_NAME = "TAMU";
 
     // Faces are a grid of 106x106 cells, 4 per row, indexed row * 4 + column.
-    // Only cell 0 is real art right now; the rest of the sheet is padded with copies,
-    // so adding expressions later is a matter of rebuilding the sheet and adding names.
+    // These must match the order the images were passed to tools/build_tamu_face.js.
+    // Sources live in art/, the sheet is rebuilt from them, see tools/ART_PROMPT.md.
     const FACE = {
-        NEUTRAL: 0
+        NEUTRAL:   0,
+        PLEASED:   1,
+        SMUG:      2,
+        ANNOYED:   3,
+        SLEEPY:    4,
+        FLAT:      5,
+        SURPRISED: 6
     };
 
     /*
@@ -100,7 +106,79 @@
     // Actors worth offering. 1-4 are the headspace party, 8-11 the real world one.
     // Slots 5, 6, 7, 12 and 13 exist but are unnamed placeholders and will produce a
     // party member with no sprite and no battler, so they are deliberately excluded.
-    const SAFE_ACTOR_IDS = [1, 2, 3, 4, 8, 9, 10, 11];
+    /*
+     * The cast exists twice and the two halves are not interchangeable. 1-4 are the
+     * headspace versions, 8-11 are the same people in Faraway Town. Putting a Faraway
+     * actor into a headspace party crashes with "Cannot set property 'x' of undefined"
+     * while the map builds follower sprites for someone the scene was never set up for.
+     *
+     * Switch 7 is named "Dream / Faraway Toggle" and looks like the obvious flag to read,
+     * but exactly one map ever turns it on and nothing ever turns it off, so it does not
+     * track the world at all. Deriving the world from who is already standing there is
+     * self-consistent and assumes nothing about game state.
+     */
+    const HEADSPACE_IDS = [1, 2, 3, 4];
+    const FARAWAY_IDS = [8, 9, 10, 11];
+
+    /* The half of the cast the current party belongs to. */
+    function currentCast() {
+        const ids = $gameParty.members().map(a => a.actorId());
+        if (ids.some(id => FARAWAY_IDS.includes(id))) return FARAWAY_IDS;
+        if (ids.some(id => HEADSPACE_IDS.includes(id))) return HEADSPACE_IDS;
+        return HEADSPACE_IDS.concat(FARAWAY_IDS); // empty or unrecognised party
+    }
+
+    const inHeadspace = () => currentCast() === HEADSPACE_IDS;
+
+    /*
+     * TAMU answers differently depending on who is holding the phone.
+     *
+     * Tagging with A swaps the party leader (Map_Character_Tag.js reserves a common event
+     * that reorders the party), so $gameParty.leader() is whoever is currently in front.
+     * Keyed by actor id: 1-4 are the headspace cast, 8-11 the same people in the real
+     * world, and they do not get the same lines.
+     *
+     * Keep each block to three lines or fewer, that is what fits the message box.
+     */
+    const VOICE = {
+        1:  { greet: ["...", "OMORI. Still not talking.", "Fine by me. What do you need?"],
+              greetFace: FACE.FLAT,
+              bye: ["...", "Yeah. Bye."], byeFace: FACE.FLAT },
+        2:  { greet: ["AUBREY. You do not have to shout,", "the phone works."],
+              greetFace: FACE.ANNOYED,
+              bye: ["Go hit something. Not the phone."], byeFace: FACE.NEUTRAL },
+        3:  { greet: ["KEL! Slow down.", "I have not said anything yet."],
+              greetFace: FACE.ANNOYED,
+              bye: ["Go bounce somewhere else."], byeFace: FACE.NEUTRAL },
+        4:  { greet: ["Oh, HERO. Someone polite for once.", "What do you need?"],
+              greetFace: FACE.PLEASED,
+              bye: ["Take care of them, would you?"], byeFace: FACE.PLEASED },
+
+        8:  { greet: ["SUNNY.", "You are quiet even on the phone.", "What do you need?"],
+              greetFace: FACE.NEUTRAL,
+              bye: ["...alright. Talk later."], byeFace: FACE.SLEEPY },
+        9:  { greet: ["AUBREY.", "You sound tired. What do you need?"],
+              greetFace: FACE.NEUTRAL,
+              bye: ["Try to sleep."], byeFace: FACE.SLEEPY },
+        10: { greet: ["KEL. Of course it is you.", "What do you need?"],
+              greetFace: FACE.SMUG,
+              bye: ["Say hi to the basketball."], byeFace: FACE.PLEASED },
+        11: { greet: ["HERO. How is the cooking going?", "What do you need?"],
+              greetFace: FACE.PLEASED,
+              bye: ["Eat something. You never do."], byeFace: FACE.NEUTRAL }
+    };
+
+    const DEFAULT_VOICE = {
+        greet: ["Hey. TAMU here.", "What do you need?"], greetFace: FACE.NEUTRAL,
+        bye:   ["Call me whenever."],                    byeFace: FACE.NEUTRAL
+    };
+
+    /* Lines for whoever is currently leading the party. */
+    function voice() {
+        const leader = $gameParty.leader();
+        const id = leader ? leader.actorId() : 0;
+        return VOICE[id] || DEFAULT_VOICE;
+    }
 
     const AMOUNTS = [1, 10, 99];
 
@@ -156,10 +234,61 @@
         if (then) later(then);
     }
 
+    /*
+     * A block of dialogue is either bare lines, or lines with an expression:
+     *
+     *   ["one", "two"]                        -> whatever face the caller defaults to
+     *   { lines: ["one"], face: FACE.SMUG }   -> a specific one
+     *
+     * Everything that shows text accepts both, so putting an expression on an existing
+     * line never means restructuring the code around it.
+     */
+    function block(value) {
+        if (!value) return null;
+        if (Array.isArray(value)) return { lines: value, face: undefined };
+        return { lines: value.lines || [], face: value.face };
+    }
+
+    /* Show several boxes back to back, then continue. */
+    function sequence(blocks, then, face) {
+        let i = 0;
+        const next = () => {
+            if (i >= blocks.length) return then && then();
+            const b = block(blocks[i++]);
+            say(b.lines, next, b.face !== undefined ? b.face : face);
+        };
+        next();
+    }
+
+    /*
+     * Whether this save has met TAMU. Stored on $gameSystem because that object is
+     * serialized into the save file, so it survives reloading and is per save slot: a new
+     * game meets him again, which is the correct behaviour for a character introduction.
+     */
+    const hasMetTamu = () => !!($gameSystem && $gameSystem._tamuPhoneMet);
+
+    const INTRO = [
+        { lines: ["...oh.", "Someone actually picked up the other end."],
+          face: FACE.SURPRISED },
+        { lines: ["I am TAMU.", "I live inside this phone.",
+                  "Do not ask how. I already checked."] },
+        { lines: ["I can bend a few things for you.", "Not the important ones. The other ones.",
+                  "You have my number now."],
+          face: FACE.SMUG }
+    ];
+
     /* The call connecting: dial tone, no face, then TAMU answers. */
     function ring() {
         AudioManager.playSe({ name: RING_SE, volume: 90, pitch: 100, pan: 0 });
-        say(["Ringing...", "Ringing......"], () => open("root"), null);
+
+        say(["Ringing...", "Ringing......"], () => {
+            if (hasMetTamu()) return open("root");
+
+            if ($gameSystem) $gameSystem._tamuPhoneMet = true;
+            // He introduces himself first, then greets whoever is actually holding the
+            // phone, so the first call ends up in the same place every other call starts.
+            sequence(INTRO, () => open("root"));
+        }, null);
     }
 
     // ------------------------------------------------------------------------
@@ -188,7 +317,11 @@
 
         const options = def.options();
 
-        $gameMessage.setFaceImage(FACE_NAME, def.face !== undefined ? def.face : FACE.NEUTRAL);
+        // face may be a plain index or a function, so a screen can react to game state.
+        // Resolved before text(), because text() is allowed to mutate state: root's
+        // greeting flips state.greeted, and the face has to be read before that happens.
+        const face = typeof def.face === "function" ? def.face() : def.face;
+        $gameMessage.setFaceImage(FACE_NAME, face !== undefined ? face : FACE.NEUTRAL);
         for (const line of def.text()) $gameMessage.add(line);
 
         // Cancel maps to the last option, which is always BACK or HANG UP. That way ESC
@@ -200,14 +333,14 @@
                 if (!choice) return hangUp();
                 if (choice.to) return open(choice.to);
                 if (choice.run) {
-                    const reply = choice.run();
+                    const reply = block(choice.run());
 
                     // An action is allowed to end the call. Check inCall rather than
                     // reopening blindly, otherwise hanging up just reopens the screen you
                     // were trying to leave. Done after the reply so a goodbye still shows.
                     const resume = () => { if (state.inCall) open(choice.back || id); };
 
-                    if (reply && reply.length) return say(reply, resume);
+                    if (reply && reply.lines.length) return say(reply.lines, resume, reply.face);
                     return resume();
                 }
                 hangUp();
@@ -257,17 +390,27 @@
     // ------------------------------------------------------------------------
 
     screen("root", {
+        // The pickup wears whoever-is-leading's expression. Coming back from a submenu is
+        // not a pickup, so it drops to neutral.
+        face: () => state.greeted ? FACE.NEUTRAL : voice().greetFace,
         // Greet once per call. Coming back from a submenu should not replay the pickup.
         text: () => {
             if (state.greeted) return ["Anything else?"];
             state.greeted = true;
-            return ["Hey. TAMU here.", "What do you need?"];
+            return voice().greet;
         },
         options: () => [
             { label: "THE PARTY", to: "party" },
             { label: "ITEMS AND CLAMS", to: "items" },
             { label: "HOW I WALK", to: "player" },
-            { label: "NOTHING, SORRY", run: () => { hangUp(); return ["Call me whenever."]; } }
+            {
+                label: "NOTHING, SORRY",
+                run: () => {
+                    const v = voice();
+                    hangUp();
+                    return { lines: v.bye, face: v.byeFace };
+                }
+            }
         ]
     });
 
@@ -283,16 +426,21 @@
                 label: "PATCH EVERYONE UP",
                 run: () => {
                     party().forEach(a => { a.setHp(a.mhp); a.setMp(a.mmp); });
-                    return ["Done. Try not to spend it all at once."];
+                    return { lines: ["Done. Try not to spend it all at once."], face: FACE.SMUG };
                 }
             },
             {
                 label: "BRING BACK THE FALLEN",
                 run: () => {
                     const down = party().filter(a => a.isDead());
-                    if (!down.length) return ["Everyone is already standing."];
+                    if (!down.length) {
+                        return { lines: ["Everyone is already standing."], face: FACE.FLAT };
+                    }
                     down.forEach(a => { a.revive(); a.setHp(a.mhp); });
-                    return [`Back on their feet: ${down.map(a => a.name()).join(", ")}.`];
+                    return {
+                        lines: [`Back on their feet: ${down.map(a => a.name()).join(", ")}.`],
+                        face: FACE.PLEASED
+                    };
                 }
             },
             { label: "ADD SOMEONE", to: "party_add" },
@@ -302,9 +450,13 @@
     });
 
     screen("party_add", {
-        text: () => ["Who should I call over?"],
+        text: () => inHeadspace()
+            ? ["Who should I call over?", "Only the ones who belong in here."]
+            : ["Who should I call over?", "Only the ones who are actually awake."],
         options: () => {
-            const available = SAFE_ACTOR_IDS
+            // Offer the current world's cast only. The other half of the cast exists, but
+            // dragging them across worlds crashes the map, so they are simply not listed.
+            const available = currentCast()
                 .map(id => $gameActors.actor(id))
                 .filter(a => a && a.name() && a.name().trim() && !$gameParty.members().includes(a));
 
@@ -315,7 +467,7 @@
                 label: `${a.name()} (${a.actorId()})`,
                 run: () => {
                     $gameParty.addActor(a.actorId());
-                    return [`${a.name()} is with you now.`];
+                    return { lines: [`${a.name()} is with you now.`], face: FACE.PLEASED };
                 },
                 back: "party"
             })).concat([{ label: "NEVER MIND", to: "party" }]);
@@ -362,15 +514,26 @@
                 label: "GIVE ME CLAMS",
                 run: () => {
                     $gameParty.gainGold(1000);
-                    return [`1000 ${TextManager.currencyUnit.trim()}. Spend it on something silly.`];
+                    return {
+                        lines: [`1000 ${TextManager.currencyUnit.trim()}. Spend it on something silly.`],
+                        face: FACE.SMUG
+                    };
                 }
             },
             {
                 label: "THE PHONE ITSELF",
                 run: () => {
-                    if ($gameParty.hasItem($dataItems[995])) return ["You are holding it. We are talking on it."];
+                    if ($gameParty.hasItem($dataItems[995])) {
+                        return {
+                            lines: ["You are holding it. We are talking on it."],
+                            face: FACE.FLAT
+                        };
+                    }
                     $gameParty.gainItem($dataItems[995], 1);
-                    return ["Now it is in your bag too. Do not think about it too hard."];
+                    return {
+                        lines: ["Now it is in your bag too.", "Do not think about it too hard."],
+                        face: FACE.SURPRISED
+                    };
                 }
             },
             { label: "BACK", to: "root" }
@@ -394,7 +557,7 @@
                 label: it.name,
                 run: () => {
                     $gameParty.gainItem(it, amount());
-                    return [`${amount()}x ${it.name}. Enjoy.`];
+                    return { lines: [`${amount()}x ${it.name}. Enjoy.`], face: FACE.SMUG };
                 },
                 back: "items_list"
             }),
@@ -430,8 +593,8 @@
                     const on = !$gamePlayer.isThrough();
                     $gamePlayer.setThrough(on);
                     return on
-                        ? ["Go on then. Do not get stuck in the scenery."]
-                        : ["Back to obeying the level design."];
+                        ? { lines: ["Go on then. Do not get stuck in the scenery."], face: FACE.SMUG }
+                        : { lines: ["Back to obeying the level design."], face: FACE.NEUTRAL };
                 }
             },
             { label: "BACK", to: "root" }
@@ -450,6 +613,15 @@
             state.greeted = false;
             later(ring);
         },
+        /*
+         * Make this save forget it ever met him, so the next call replays the intro.
+         * Handy while writing the introduction, since otherwise you only get one look at
+         * it per save file.
+         */
+        forget() {
+            if ($gameSystem) $gameSystem._tamuPhoneMet = false;
+        },
+
         /* Exposed so you can poke at it from the console while building. */
         screens: SCREENS,
         state
