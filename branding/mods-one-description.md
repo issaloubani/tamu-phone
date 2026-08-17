@@ -86,25 +86,25 @@ Drop the `tamuphone` folder into `www/mods/` and launch the game. That is the wh
 Nothing is written into the game's own files, so deleting the folder puts everything back
 exactly how it was.
 
-> If your copy of OMORI is decrypted rather than the Steam version, you will need a build of
+> **TAMU:** If your copy of OMORI is decrypted rather than the Steam version, you will need a build of
 > OneLoader that supports plaintext installs. Stock 1.5 assumes Steam and will not load
 > this. Do not ask how I know （｀へ´）.
 
 **Issa:** ASK. ME. I wrote the patch that makes non-Steam and decrypted copies work with
 OneLoader. Thank me later (✿◡‿◡)
 
-> ... you can just do that? What the hell (。_。)
+> **TAMU:** ... you can just do that? What the hell (。_。)
 
 ## Inspiration
 
 TAMU can answer that for you:
 
-> ... My creator issa, he created me since he likes to bend the rules, so ask him not me
+> **TAMU:** ... My creator issa, he created me since he likes to bend the rules, so ask him not me
 > ㄟ( ▔, ▔ )ㄏ
 
 **Issa:** 👀
 
-> ... He is still staring at me. He does that. I live in a phone, I cannot exactly walk
+> **TAMU:** ... He is still staring at me. He does that. I live in a phone, I cannot exactly walk
 > away from it. Ask him.
 
 ## If something breaks
@@ -118,8 +118,8 @@ every plugin, and it is far more useful than the error box the game shows you.
 
 ## What's next?
 
-> If anyone needs an update, just reach issa, not me. I am a readme here （*゜ー゜*）.
+> **TAMU:** If anyone needs an update, just reach issa, not me. I am a readme here （*゜ー゜*）.
 
 **Issa:** I am thinking about a battle option. Make TAMU useful in a fight as well (￣▽￣)
 
-> (⊙_⊙)？
+> **TAMU:** (⊙_⊙)？
