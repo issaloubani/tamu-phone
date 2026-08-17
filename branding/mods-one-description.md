@@ -3,7 +3,7 @@
 Meet TAMU, a blunt smug cat that lives inside a phone. You can always rely on him to help
 you bend the rules (●'◡'●).
 
-![Calling TAMU as OMORI](screenshots/01-calling-omori.png)
+![Calling TAMU as OMORI](https://raw.githubusercontent.com/issaloubani/tamu-phone/main/screenshots/01-calling-omori.png)
 
 ## What the hell is this
 
@@ -27,7 +27,7 @@ He can help you with:
 He also answers differently depending on who is holding the phone, so tag with **A** and
 call him again. OMORI gets a very different conversation than HERO does （*゜ー゜*）.
 
-![Adjusting how you walk](screenshots/04-how-i-walk.png)
+![Adjusting how you walk](https://raw.githubusercontent.com/issaloubani/tamu-phone/main/screenshots/04-how-i-walk.png)
 
 The whole thing, if you would rather see it at once:
 
@@ -64,9 +64,9 @@ If **J** does nothing, it is bound elsewhere on your setup. Change one number at
 First time you call on a save, he introduces himself. After that he gets straight to the
 point, like a normal person. Cat. Whatever he is.
 
-![The phone ringing and TAMU picking up](screenshots/02-first-call.png)
+![The phone ringing and TAMU picking up](https://raw.githubusercontent.com/issaloubani/tamu-phone/main/screenshots/02-first-call.png)
 
-![TAMU explaining himself](screenshots/03-intro.png)
+![TAMU explaining himself](https://raw.githubusercontent.com/issaloubani/tamu-phone/main/screenshots/03-intro.png)
 
 ## Use a save slot you do not care about
 
@@ -123,38 +123,3 @@ every plugin, and it is far more useful than the error box the game shows you.
 **Issa:** I am thinking about a battle option. Make TAMU useful in a fight as well (￣▽￣)
 
 > (⊙_⊙)？
-
----
-
-## For people poking at the code
-
-The conversation is not a custom UI. Every screen is an ordinary `$gameMessage` with a face
-plus an ordinary `Window_ChoiceList`, which is why it looks native. The interesting part is
-the driver: a choice callback fires while the message system is still tearing down, so the
-next screen is parked and run from `Scene_Map.update` once things go quiet. That is about
-fifteen lines and everything else is a data structure.
-
-Rebuilding TAMU's face sheet, if you change the art in `art/`:
-
-```bash
-node tools/build_tamu_face.js img/faces/TAMU.png art/00_neutral.png art/01_pleased.png ...
-```
-
-Faces are a grid of 106x106 cells, 4 per row, indexed `row * 4 + column`. The order you pass
-them is the order they land in, and it has to match the `FACE` map at the top of
-`plugins/tamu_phone.js`.
-
-`tools/clean_art.js` turns a flat-colour drawing on a neutral background into a transparent
-PNG, which is what you need when an image generator hands you back a JPEG with its own
-transparency checkerboard baked in. It needs `npm i jpeg-js` for JPEG input; PNG input works
-with no dependencies.
-
-Two things that make editing the writing bearable. From the console:
-
-```js
-$tamuPhone.forget()    // this save forgets it met him, so the intro replays
-$tamuPhone.state       // page, amount, whether a call is live
-```
-
-Whether a save has met TAMU lives on `$gameSystem`, which is serialized with the save, so
-the introduction is per slot rather than global.
